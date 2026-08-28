@@ -1,0 +1,147 @@
+# Consumables sentence templates for Home Assistant's built-in intent matcher.
+#
+# Copy to <config>/custom_sentences/en/consumables.yaml alongside the intent_script
+# and rest_command snippets in this directory.
+#
+# These handle the formulaic bulk of voice traffic with no LLM in the loop: matching
+# happens on the HA host, offline, in about a millisecond, and costs nothing. Only
+# phrasings that miss here fall through to the conversation agent.
+#
+# Three things to know about the phrasing choices:
+#
+#   * The item name is a wildcard, so no vocabulary is synced into HA. Whatever the
+#     speech-to-text produced is posted verbatim and resolved server-side, where the
+#     tenant's item names and aliases actually live.
+#
+#   * "add X" on its own is deliberately NOT matched. It collides with the built-in
+#     HassListAddItem intent from the `todo` integration, and sentence priority
+#     between custom and built-in sentences is fragile. Requiring a destination
+#     ("add X to the pantry") reads naturally and stays unambiguous. Bare "add milk"
+#     falls through to the LLM, which is the right place to disambiguate it.
+#
+#   * hassil syntax: (a|b) is a required choice, [x] is optional. `(x )?` is NOT
+#     optional-group syntax — it silently fails to match. Contractions must be
+#     whole-token alternatives too: `what ('s|is)` needs a literal space in the
+#     utterance, so write `(what's|what is)`. Both mistakes fail silently — run
+#     `apps/inventory/tests/test_sentences.py` after editing this file.
+#
+#   * "add X to the shopping list" is included below for AddToShoppingList, but if a
+#     household leaves HA's built-in `todo` integration enabled, its own list-add
+#     intent can win that exact phrasing before ours ever sees it (custom vs. built-in
+#     sentence priority is fragile, same reason bare "add X" is avoided above). Either
+#     disable that HA intent for the shopping list, or just use "put X on the
+#     shopping list", which nothing else claims.
+
+language: "en"
+
+lists:
+  # Free text — the server resolves it against Item.name and Item.aliases.
+  name:
+    wildcard: true
+  delta:
+    range:
+      from: 1
+      to: 99
+
+expansion_rules:
+  # Where a household keeps consumables. Several spellings keep the disambiguator
+  # from feeling like a magic word.
+  store: "[(the|our) ](pantry|inventory|supplies|stock|store cupboard)"
+  shopping_list: "[(the|our) ](shopping|grocery) list"
+
+intents:
+  AddConsumable:
+    data:
+      # With an explicit count: "add 3 paper towels to the pantry"
+      - sentences:
+          - "(add|put) {delta} {name} (to|in|into) <store>"
+          # [more ] must be spelled out, or the wildcard swallows it into the
+          # item name and "we got 2 more coffee" looks for "more coffee".
+          - "[(I|we) ][just ](bought|picked up|got|have) {delta} [more ]{name}"
+      # Without one — assume a single unit.
+      - sentences:
+          - "(add|put) {name} (to|in|into) <store>"
+          - "[(I|we) ][just ](bought|picked up|got) [(some|a|an) ]{name}"
+          - "(restock|refill|replenish) [the ]{name}"
+        slots:
+          delta: 1
+
+  RemoveConsumable:
+    data:
+      - sentences:
+          - "(remove|take|use[d]|took) {delta} {name}"
+          - "(remove|take) {delta} {name} (from|out of) <store>"
+      - sentences:
+          - "[(I|we) ][just ](used|took|opened|finished) [(a|an|one|some|the last) ]{name}"
+          - "(remove|take) {name} (from|out of) <store>"
+        slots:
+          delta: 1
+
+  SetConsumableState:
+    data:
+      # "we're out of dish soap" — the highest-value phrasing, and the one people
+      # actually say at the moment they notice something has run out.
+      - sentences:
+          - "(we're|we are|we've|we have|I'm|I am) [all ]out of {name}"
+          - "(we|I) (ran|have run) out of {name}"
+          - "(there's|there is) no {name} (left|remaining)"
+          - "{name} (is|are) [all ](gone|out|empty|finished)"
+        slots:
+          state: "out"
+      - sentences:
+          - "(we're|we are|we|I'm|I am|I) [(running|getting) ]low on {name}"
+          - "(we're|we are) almost out of {name}"
+          - "{name} (is|are) [(running|getting) ]low"
+        slots:
+          state: "low"
+      - sentences:
+          - "(we're|we are) (stocked up on|fine for|good for) {name}"
+          - "{name} (is|are) (restocked|back in stock|fine|full)"
+        slots:
+          state: "in_stock"
+
+  QueryConsumable:
+    data:
+      - sentences:
+          - "how (much|many) {name} (do we|do I|have we|have I) (have|got)[ left]"
+          - "how (much|many) {name} (is|are) (there|left)"
+          - "(do|have) (we|I) (have|got) [(any|enough) ]{name}"
+          - "(what's|what is) (our|the) {name} (count|level|stock)"
+          - "are we out of {name}"
+
+  ListLowStock:
+    data:
+      - sentences:
+          - "what (are we|am I|do we|do I) [running ]low on"
+          - "(what's|what is|what are) [(running|getting) ]low"
+          - "what (do|should) (we|I) need to (buy|get|restock|reorder)"
+          - "(what's|what is) [(on|in) ]<store> (running low|low)"
+          - "(anything|what) [do ](we|I) need (to buy|from the (shop|shops|store))"
+
+  AddToShoppingList:
+    data:
+      # With an explicit count: "put 3 milk on the shopping list", "we need 2 milk"
+      - sentences:
+          - "put {delta} {name} on <shopping_list>"
+          - "(we|I) need {delta} {name}"
+      # Without one — assume a single unit.
+      - sentences:
+          - "put {name} on <shopping_list>"
+          - "add {name} to <shopping_list>"
+          - "(we|I) need {name}"
+        slots:
+          delta: 1
+
+  ListShopping:
+    data:
+      - sentences:
+          - "(what's|what is) [(on|in) ]<shopping_list>"
+
+  CheckOffShopping:
+    data:
+      - sentences:
+          # "bought/picked up {name}" is already AddConsumable's — these phrasings are
+          # deliberately different so the two intents can't collide.
+          - "check off {name}"
+          - "(cross|tick) {name} off <shopping_list>"
+          - "mark {name} as bought"

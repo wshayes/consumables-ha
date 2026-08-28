@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Consumables",
+        "description": "Open Consumables in your browser, go to Voice, and select Connect Home Assistant to generate a pairing code.",
+        "data": {
+          "base_url": "Consumables address",
+          "pairing_code": "Pairing code"
+        },
+        "data_description": {
+          "base_url": "For example https://yourhousehold.example.com",
+          "pairing_code": "The 8-character code shown on the Voice page. It expires after 10 minutes."
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "That pairing code is invalid or has expired. Generate a new one and try again.",
+      "cannot_connect": "Could not reach that address. Check it and that this machine can see the server.",
+      "unknown": "Something went wrong. Check the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "This household is already connected. Its token has been refreshed."
+    }
+  }
+}

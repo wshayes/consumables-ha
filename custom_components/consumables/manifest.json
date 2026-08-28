@@ -1,0 +1,13 @@
+{
+  "domain": "consumables",
+  "name": "Consumables",
+  "codeowners": ["@wshayes"],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://github.com/wshayes/consumables-ha",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/wshayes/consumables-ha/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
