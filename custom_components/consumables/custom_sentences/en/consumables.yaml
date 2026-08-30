@@ -1,7 +1,10 @@
 # Consumables sentence templates for Home Assistant's built-in intent matcher.
 #
-# Copy to <config>/custom_sentences/en/consumables.yaml alongside the intent_script
-# and rest_command snippets in this directory.
+# Installed automatically into <config>/custom_sentences/en/ when the integration
+# sets up. Do not edit here — this is a copy of ha/custom_sentences/en/consumables.yaml
+# in the Consumables server repo, minus the Heat2Eat intents, which are omitted
+# because intents.py registers no handlers for them. Add the handlers first, then
+# the sentences; a matched intent with no handler is an error spoken at the user.
 #
 # These handle the formulaic bulk of voice traffic with no LLM in the loop: matching
 # happens on the HA host, offline, in about a millisecond, and costs nothing. Only
@@ -13,24 +16,20 @@
 #     speech-to-text produced is posted verbatim and resolved server-side, where the
 #     tenant's item names and aliases actually live.
 #
-#   * "add X" on its own is deliberately NOT matched. It collides with the built-in
-#     HassListAddItem intent from the `todo` integration, and sentence priority
-#     between custom and built-in sentences is fragile. Requiring a destination
-#     ("add X to the pantry") reads naturally and stays unambiguous. Bare "add milk"
-#     falls through to the LLM, which is the right place to disambiguate it.
+#   * These sentences assume Home Assistant's own list entity is NOT exposed to
+#     Assist. Its built-in HassListAddItem intent claims "add X" and "add X to the
+#     shopping list", and priority between custom and built-in sentences is fragile,
+#     so leaving both on makes those phrasings a coin flip. Turn `todo.shopping_list`
+#     off under Settings -> Voice assistants -> Expose (the HACS README walks
+#     through it). With it off, bare "add X" is ours and goes on the shopping list,
+#     which is the behaviour people already have muscle memory for; "add X to the
+#     pantry" still means the inventory.
 #
 #   * hassil syntax: (a|b) is a required choice, [x] is optional. `(x )?` is NOT
 #     optional-group syntax — it silently fails to match. Contractions must be
 #     whole-token alternatives too: `what ('s|is)` needs a literal space in the
 #     utterance, so write `(what's|what is)`. Both mistakes fail silently — run
-#     `apps/inventory/tests/test_sentences.py` after editing this file.
-#
-#   * "add X to the shopping list" is included below for AddToShoppingList, but if a
-#     household leaves HA's built-in `todo` integration enabled, its own list-add
-#     intent can win that exact phrasing before ours ever sees it (custom vs. built-in
-#     sentence priority is fragile, same reason bare "add X" is avoided above). Either
-#     disable that HA intent for the shopping list, or just use "put X on the
-#     shopping list", which nothing else claims.
+#     `apps/inventory/tests/test_sentences.py` in the server repo after editing.
 
 language: "en"
 
@@ -47,6 +46,14 @@ expansion_rules:
   # Where a household keeps consumables. Several spellings keep the disambiguator
   # from feeling like a magic word.
   store: "[(the|our) ](pantry|inventory|supplies|stock|store cupboard)"
+  # Everything a person says between the verb and the thing itself: an article, a
+  # partitive ("the last of the"), or a container ("a bottle of"). Every part is
+  # optional, so it costs nothing when they say none of it. Without this the
+  # wildcard swallows the lot and the server is asked to resolve "of the dish
+  # soap" or "the milk" — the same trap the explicit [more ] below avoids, which
+  # is why that one is now folded in here.
+  det: >-
+    [(a|an|one|another|some|more|the) ][(last|rest) ][of ][(the|our) ][(bottle|box|can|bag|jar|jug|carton|packet|pack|roll|tube|tub|tin|bar|case) of ][(the|our) ]
   shopping_list: "[(the|our) ](shopping|grocery) list"
 
 intents:
@@ -54,26 +61,24 @@ intents:
     data:
       # With an explicit count: "add 3 paper towels to the pantry"
       - sentences:
-          - "(add|put) {delta} {name} (to|in|into) <store>"
-          # [more ] must be spelled out, or the wildcard swallows it into the
-          # item name and "we got 2 more coffee" looks for "more coffee".
-          - "[(I|we) ][just ](bought|picked up|got|have) {delta} [more ]{name}"
+          - "(add|put) {delta} <det>{name} (to|in|into) <store>"
+          - "[(I|we) ][just ](bought|picked up|got|have) {delta} <det>{name}"
       # Without one — assume a single unit.
       - sentences:
-          - "(add|put) {name} (to|in|into) <store>"
-          - "[(I|we) ][just ](bought|picked up|got) [(some|a|an) ]{name}"
-          - "(restock|refill|replenish) [the ]{name}"
+          - "(add|put) <det>{name} (to|in|into) <store>"
+          - "[(I|we) ][just ](bought|picked up|got) <det>{name}"
+          - "(restock|refill|replenish) <det>{name}"
         slots:
           delta: 1
 
   RemoveConsumable:
     data:
       - sentences:
-          - "(remove|take|use[d]|took) {delta} {name}"
-          - "(remove|take) {delta} {name} (from|out of) <store>"
+          - "(remove|take|use[d]|took) {delta} <det>{name}"
+          - "(remove|take) {delta} <det>{name} (from|out of) <store>"
       - sentences:
-          - "[(I|we) ][just ](used|took|opened|finished) [(a|an|one|some|the last) ]{name}"
-          - "(remove|take) {name} (from|out of) <store>"
+          - "[(I|we) ][just ](used|took|opened|finished) <det>{name}"
+          - "(remove|take) <det>{name} (from|out of) <store>"
         slots:
           delta: 1
 
@@ -118,20 +123,6 @@ intents:
           - "(what's|what is) [(on|in) ]<store> (running low|low)"
           - "(anything|what) [do ](we|I) need (to buy|from the (shop|shops|store))"
 
-  AddToShoppingList:
-    data:
-      # With an explicit count: "put 3 milk on the shopping list", "we need 2 milk"
-      - sentences:
-          - "put {delta} {name} on <shopping_list>"
-          - "(we|I) need {delta} {name}"
-      # Without one — assume a single unit.
-      - sentences:
-          - "put {name} on <shopping_list>"
-          - "add {name} to <shopping_list>"
-          - "(we|I) need {name}"
-        slots:
-          delta: 1
-
   ListShopping:
     data:
       - sentences:
@@ -145,3 +136,29 @@ intents:
           - "check off {name}"
           - "(cross|tick) {name} off <shopping_list>"
           - "mark {name} as bought"
+
+  # Bare "(add|put) {name}" has no trailing anchor, so on its own it matches "put the
+  # lasagne in the fridge" with name="lasagne in the fridge". What saves it is the
+  # matcher, not the ordering: HA's default agent calls hassil's recognize_best
+  # (see homeassistant/components/conversation/default_agent.py), which prefers the
+  # sentence matching the most literal text and so picks the anchored phrasing every
+  # time. Plain recognize() gets these wrong, which is why the test uses the same
+  # call HA makes. Declared last anyway — it costs nothing and keeps the greedy rule
+  # out of the way of any matcher that does walk in order.
+  AddToShoppingList:
+    data:
+      # With an explicit count: "put 3 milk on the shopping list", "we need 2 milk"
+      - sentences:
+          - "put {delta} <det>{name} on <shopping_list>"
+          - "(add|put) {delta} <det>{name}"
+          - "(we|I) need {delta} <det>{name}"
+      # Without one — assume a single unit.
+      - sentences:
+          - "put <det>{name} on <shopping_list>"
+          - "add <det>{name} to <shopping_list>"
+          # Bare "add milk" — ours only because HA's list entity is unexposed. The
+          # anchored phrasings sit above it so they win inside this intent too.
+          - "(add|put) <det>{name}"
+          - "(we|I) need <det>{name}"
+        slots:
+          delta: 1

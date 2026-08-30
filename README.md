@@ -4,6 +4,7 @@ Keep your household inventory up to date by talking to a Home Assistant Voice de
 
 > "We're out of paper towels."
 > "Add three paper towels to the pantry."
+> "Add milk." — goes on the shopping list
 > "What are we running low on?"
 
 ## Install
@@ -16,8 +17,33 @@ Keep your household inventory up to date by talking to a Home Assistant Voice de
    code, and enter it along with your Consumables address.
 5. Restart once more so Home Assistant picks up the sentence templates the
    integration installed.
+6. **Turn off Home Assistant's own shopping list** — see below. This one is not
+   optional.
 
 There is no token to copy and nothing to paste into `configuration.yaml`.
+
+## Turn off Home Assistant's own shopping list
+
+> **⚠️ Consumables and Home Assistant's built-in shopping list collide.** Both claim
+> "add milk" and "add milk to the shopping list". Which one wins is decided by
+> Home Assistant's sentence matcher, not by either integration, so leaving both
+> enabled makes those phrasings a coin flip — some of what you say lands on a list
+> Consumables cannot see, and you find out at the shops.
+
+Consumables replaces it rather than sitting alongside it. Its list is filtered by
+store, fills itself from anything running low, and checking an item off restocks the
+item it came from.
+
+1. **Settings → Voice assistants**, then the **Expose** tab.
+2. Find `todo.shopping_list` (older installs name it `shopping_list.shopping_list`).
+3. Toggle it off.
+
+The entity, its contents, and any automation or dashboard card using it all keep
+working — Assist just stops targeting it. Flip the toggle back to undo.
+
+If you would rather remove it entirely: **Settings → Devices & services → Local
+To-do** (or **Shopping list** on older installs) → delete the entry. That does
+delete whatever is on the list, so check it first.
 
 ## Set up your assistant
 
@@ -48,9 +74,9 @@ alias — so "loo roll" costs one round trip, once, and is free from then on.
 
 ## Notes
 
-- **"add milk" is deliberately not matched.** It collides with Home Assistant's own
-  shopping-list intent. Say "add milk to the pantry", or let it fall through to the
-  conversation agent.
+- **Bare "add milk" goes on the shopping list**, matching the habit Home Assistant's
+  own list built. Say "add milk to the pantry" when you mean the inventory — that you
+  already have it, rather than needing to buy it. Both are matched locally and free.
 - **Rotating credentials.** Generating a new pairing code invalidates the old token.
   Re-run the integration setup with the new code.
 - **Your data stays in your Consumables instance.** This integration talks only to
