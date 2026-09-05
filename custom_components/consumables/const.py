@@ -14,6 +14,7 @@ CONF_TENANT = "tenant"
 PATH_PAIR = "/app/api/pair"
 PATH_ADJUST = "/app/api/inventory/adjust"
 PATH_QUERY = "/app/api/inventory/query"
+PATH_ANSWER_LOCATION = "/app/api/inventory/answer-location"
 PATH_LOW = "/app/api/inventory/low"
 PATH_INTERPRET = "/app/api/voice/interpret"
 PATH_SHOPPING = "/app/api/shopping"
@@ -35,5 +36,7 @@ INTENT_SHOP_CHECK = "CheckOffShopping"
 # "add X to the shopping list" and outrank ours, so we answer it too rather than
 # leaving it to fail as "Unknown intent" on installs with no shopping_list set up.
 INTENT_HASS_SHOP_ADD = "HassShoppingListAddItem"
+# Answering "where does it live?" after adding something never stocked before.
+INTENT_ANSWER_LOCATION = "AnswerLocation"
 
 REQUEST_TIMEOUT = 15

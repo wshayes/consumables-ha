@@ -46,6 +46,26 @@ lists:
       from: 1
       to: 99
 
+  # Where a household keeps things, for answering "where does it live?" after
+  # adding something new. Deliberately NOT the `location` list above: <cold_slot>
+  # uses that one to tell a cooked dish going in the freezer from groceries going in
+  # the pantry, and widening it would turn "put the chili in the pantry" into a dish.
+  storage:
+    values:
+      - "fridge"
+      - "refrigerator"
+      - "freezer"
+      - "deep freeze"
+      - "pantry"
+      - "larder"
+      - "kitchen"
+      - "bathroom"
+      - "laundry"
+      - "garage"
+      - "basement"
+      - "cupboard"
+      - "cabinet"
+
 expansion_rules:
   # Where a household keeps consumables. Several spellings keep the disambiguator
   # from feeling like a magic word.
@@ -170,3 +190,15 @@ intents:
           - "(we|I) need <det>{item}"
         slots:
           delta: 1
+
+  # Answering the question a new item asks. Anchored on a storage word so it cannot
+  # swallow an ordinary sentence, and the server ignores it unless a question is
+  # genuinely open — "the fridge" said out of nowhere is answered "I wasn't asking
+  # anything" rather than filing something. Declared last for the same reason
+  # AddToShoppingList is: its bare form has no trailing anchor.
+  AnswerLocation:
+    data:
+      - sentences:
+          - "[it ](goes|lives|belongs) [in ][(the|our) ]{storage}"
+          - "(in|on|under|inside) [(the|our) ]{storage}"
+          - "[(the|our) ]{storage}"

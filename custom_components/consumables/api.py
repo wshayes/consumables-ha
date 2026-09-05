@@ -14,6 +14,7 @@ import aiohttp
 
 from .const import (
     PATH_ADJUST,
+    PATH_ANSWER_LOCATION,
     PATH_INTERPRET,
     PATH_LOW,
     PATH_PAIR,
@@ -96,6 +97,10 @@ class ConsumablesClient:
         if state is not None:
             payload["state"] = state
         return await self._request("POST", PATH_ADJUST, json=payload)
+
+    async def answer_location(self, location: str, *, source: str = "ha") -> dict[str, Any]:
+        """Where a newly added item lives — the second half of a two-turn add."""
+        return await self._request("POST", PATH_ANSWER_LOCATION, json={"location": location, "source": source})
 
     async def query(self, name: str) -> dict[str, Any]:
         return await self._request("GET", PATH_QUERY, params={"name": name})

@@ -20,6 +20,7 @@ from homeassistant.helpers import config_validation as cv, intent
 from .const import (
     DOMAIN,
     INTENT_ADD,
+    INTENT_ANSWER_LOCATION,
     INTENT_LIST_LOW,
     INTENT_QUERY,
     INTENT_REMOVE,
@@ -63,6 +64,11 @@ def _describe_failure(body: dict, spoken_name: str) -> str | None:
             return f"Did you mean {' or '.join(candidates)}?"
         return "Which one did you mean?"
     if status == 404:
+        # The server composes this one. An add for something never stocked comes back
+        # 404 carrying a question ("Where does it live?") rather than a refusal, and
+        # reading our own sentence over the top would throw the question away.
+        if body.get("speech"):
+            return body["speech"]
         return f"I don't have {spoken_name} in the inventory yet — add it in the app first."
     return "Sorry, I couldn't reach the inventory."
 
@@ -182,6 +188,28 @@ class _ShoppingAddHandler(intent.IntentHandler):
         return _speak(intent_obj, f"Added {line.get('name', name)} to the shopping list.")
 
 
+class _AnswerLocationHandler(intent.IntentHandler):
+    """The second turn of adding something the inventory had never seen.
+
+    A plain follow-up utterance rather than a continued conversation: the bundled
+    sentences match "in the fridge" on their own, so the household can answer at
+    their own pace and the satellite needs no dialogue state. The server holds the
+    half-made item and knows whether a question is actually open.
+    """
+
+    intent_type = INTENT_ANSWER_LOCATION
+    slot_schema = {vol.Optional("storage"): cv.string, vol.Optional("location"): cv.string}
+
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
+        slots = self.async_validate_slots(intent_obj.slots)
+        spoken = (slots.get("storage") or slots.get("location") or {}).get("value", "")
+
+        body = await _client_for(intent_obj.hass).answer_location(spoken, source=_device_of(intent_obj))
+        if body.get("status") != 200:
+            return _speak(intent_obj, "Sorry, I couldn't file that.")
+        return _speak(intent_obj, body.get("speech") or "Done.")
+
+
 class _ShoppingListHandler(intent.IntentHandler):
     intent_type = INTENT_SHOP_LIST
     slot_schema: dict = {}
@@ -221,6 +249,7 @@ async def async_register_intents(hass: HomeAssistant) -> None:
         _ListLowHandler(),
         _ShoppingAddHandler(INTENT_SHOP_ADD),
         _ShoppingAddHandler(INTENT_HASS_SHOP_ADD),
+        _AnswerLocationHandler(),
         _ShoppingListHandler(),
         _ShoppingCheckHandler(),
     ):
