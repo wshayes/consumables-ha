@@ -57,7 +57,7 @@ expansion_rules:
   # soap" or "the milk" — the same trap the explicit [more ] below avoids, which
   # is why that one is now folded in here.
   det: >-
-    [(a|an|one|another|some|more|the) ][(last|rest) ][of ][(the|our) ][(bottle|box|can|bag|jar|jug|carton|packet|pack|roll|tube|tub|tin|bar|case) of ][(the|our) ]
+    [(a|an|one|another|some|more|the) ][(last|rest) ][of ][(the|our) ][(bag|bags|bar|bars|block|blocks|bottle|bottles|box|boxes|can|cans|carton|cartons|case|cases|container|containers|crate|crates|cup|cups|jar|jars|jug|jugs|loaf|loaves|pack|packs|packet|packets|pot|pots|punnet|punnets|roll|rolls|sachet|sachets|sack|sacks|stick|sticks|tin|tins|tray|trays|tub|tubs|tube|tubes) of ][(the|our) ]
   shopping_list: "[(the|our) ](shopping|grocery) list"
 
 intents:
@@ -78,7 +78,11 @@ intents:
   RemoveConsumable:
     data:
       - sentences:
-          - "(remove|take|use[d]|took) {delta} <det>{item}"
+          # "[(I|we) ][just ]" has to be here as well as on the uncounted rule
+          # below: without it "we used 2 sticks of butter" fell through to that
+          # one, which carries no {delta}, and the count vanished into the
+          # wildcard as name="2 sticks of butter".
+          - "[(I|we) ][just ](remove[d]|take|took|use[d]|open[ed]|finish[ed]) {delta} <det>{item}"
           - "(remove|take) {delta} <det>{item} (from|out of) <store>"
       - sentences:
           - "[(I|we) ][just ](used|took|opened|finished) <det>{item}"
