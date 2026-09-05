@@ -20,6 +20,9 @@ from homeassistant.helpers import config_validation as cv, intent
 from .const import (
     DOMAIN,
     INTENT_ADD,
+    INTENT_DISH_ADD,
+    INTENT_DISH_EAT,
+    INTENT_DISH_LIST,
     INTENT_ANSWER_LOCATION,
     INTENT_LIST_LOW,
     INTENT_QUERY,
@@ -272,6 +275,94 @@ class _ShoppingCheckHandler(intent.IntentHandler):
         return _speak(intent_obj, f"Checked off {body.get('line', {}).get('name', name)}.")
 
 
+class _DishAddHandler(intent.IntentHandler):
+    """Food put away by the portion — leftovers, or meal prep when they say so.
+
+    `kind` defaults to leftovers everywhere it is absent, here included: everything
+    this feature did before meal prep existed was leftovers, and only the speaker
+    knows which one they mean.
+    """
+
+    intent_type = INTENT_DISH_ADD
+    slot_schema = {
+        vol.Required("item"): cv.string,
+        vol.Optional("delta"): vol.Coerce(int),
+        vol.Optional("kind"): cv.string,
+        vol.Optional("location"): cv.string,
+    }
+
+    @staticmethod
+    def _value(slots: dict, key: str, default=""):
+        return slots.get(key, {}).get("value", default)
+
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
+        slots = self.async_validate_slots(intent_obj.slots)
+        body = await _client_for(intent_obj.hass).dish_add(
+            slots["item"]["value"],
+            kind=self._value(slots, "kind", "leftovers") or "leftovers",
+            portions=int(self._value(slots, "delta", 1) or 1),
+            location=self._value(slots, "location"),
+            source=_device_of(intent_obj),
+        )
+        if body.get("status") != 200:
+            return _speak(intent_obj, body.get("speech") or "Sorry, I couldn't put that away.")
+
+        dish = body.get("dish") or {}
+        where = f" in the {dish['location'].lower()}" if dish.get("location") else ""
+        return _speak(intent_obj, f"Put {dish.get('portions', 1)} of {dish.get('name')} away{where}.")
+
+
+class _DishEatHandler(intent.IntentHandler):
+    """Someone took portions. Leftovers are searched first — they are the ones on a
+    clock — and the server decides that, not this handler."""
+
+    intent_type = INTENT_DISH_EAT
+    slot_schema = {
+        vol.Required("item"): cv.string,
+        vol.Optional("delta"): vol.Coerce(int),
+        vol.Optional("kind"): cv.string,
+        vol.Optional("location"): cv.string,
+    }
+
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
+        slots = self.async_validate_slots(intent_obj.slots)
+        name = slots["item"]["value"]
+        body = await _client_for(intent_obj.hass).dish_eat(
+            name,
+            portions=int(slots.get("delta", {}).get("value", 1) or 1),
+            location=slots.get("location", {}).get("value", ""),
+            kind=slots.get("kind", {}).get("value", ""),
+            source=_device_of(intent_obj),
+        )
+        if body.get("status") == 409:
+            return _speak(intent_obj, f"Did you mean {' or '.join(body.get('candidates') or [])}?")
+        if body.get("status") != 200:
+            return _speak(intent_obj, body.get("speech") or f"I couldn't find {name} to eat.")
+
+        left = body.get("remaining", 0)
+        if left > 0:
+            return _speak(intent_obj, f"{left} of {body.get('name', name)} left.")
+        return _speak(intent_obj, f"That was the last of the {body.get('name', name)}.")
+
+
+class _DishListHandler(intent.IntentHandler):
+    """What is put away. The sentence is composed server-side and read out verbatim,
+    so the page, the phone and this speaker cannot phrase it differently."""
+
+    intent_type = INTENT_DISH_LIST
+    slot_schema = {vol.Optional("kind"): cv.string, vol.Optional("scope"): cv.string}
+
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
+        slots = self.async_validate_slots(intent_obj.slots)
+        body = await _client_for(intent_obj.hass).dish_list(
+            kind=slots.get("kind", {}).get("value", "leftovers") or "leftovers",
+            scope=slots.get("scope", {}).get("value", "all") or "all",
+        )
+        if body.get("status") != 200:
+            return _speak(intent_obj, body.get("speech") or "Sorry, I couldn't reach the kitchen list.")
+        return _speak(intent_obj, body.get("speech") or "Nothing put away.")
+
+
 async def async_register_intents(hass: HomeAssistant) -> None:
     """Register every handler. Safe to call once per config entry setup."""
     for handler in (
@@ -286,5 +377,8 @@ async def async_register_intents(hass: HomeAssistant) -> None:
         _AnswerLocationHandler(),
         _ShoppingListHandler(),
         _ShoppingCheckHandler(),
+        _DishAddHandler(),
+        _DishEatHandler(),
+        _DishListHandler(),
     ):
         intent.async_register(hass, handler)

@@ -66,6 +66,16 @@ lists:
       - "cupboard"
       - "cabinet"
 
+  # Captured so "put the chili in the freezer" records where it went. Matched
+  # server-side against the household's own Location rows, so a household that
+  # calls it "pantry freezer" still resolves from the spoken "freezer".
+  location:
+    values:
+      - "fridge"
+      - "refrigerator"
+      - "freezer"
+      - "deep freeze"
+
 expansion_rules:
   # Where a household keeps consumables. Several spellings keep the disambiguator
   # from feeling like a magic word.
@@ -79,6 +89,11 @@ expansion_rules:
   det: >-
     [(a|an|one|another|some|more|the) ][(last|rest) ][of ][(the|our) ][(bag|bags|bar|bars|block|blocks|bottle|bottles|box|boxes|can|cans|carton|cartons|case|cases|container|containers|crate|crates|cup|cups|jar|jars|jug|jugs|loaf|loaves|pack|packs|packet|packets|pot|pots|punnet|punnets|roll|rolls|sachet|sachets|sack|sacks|stick|sticks|tin|tins|tray|trays|tub|tubs|tube|tubes) of ][(the|our) ]
   shopping_list: "[(the|our) ](shopping|grocery) list"
+
+  cold_slot: "[(the|our) ]{location}"
+  portions: "(portion|portions|serving|servings|container|containers)"
+  mealprep: "(meal prep|mealprep|meal-prep|meal preps|prepped meals|freezer meals)"
+  leftovers: "(leftover|leftovers|dish|dishes|meal|meals)"
 
 intents:
   AddConsumable:
@@ -215,3 +230,142 @@ intents:
           - "[it ](goes|lives|belongs) [in ][(the|our) ]{storage}"
           - "(in|on|under|inside) [(the|our) ]{storage}"
           - "[(the|our) ]{storage}"
+
+  # Dishes — leftovers and meal prep. Every phrasing here is one no consumables
+  # intent can also claim — "we got some chili left over" would match
+  # AddConsumable's "we got some {item}" with name="chili left over", so it is
+  # deliberately absent and left to the LLM, which disambiguates it correctly.
+  # Templates take only the unambiguous traffic.
+  #
+  # `kind` is a fixed slot, not a captured one: the sentence decides which list a
+  # phrasing means. Leaving it off means leftovers, which is what all of this
+  # meant before meal prep existed.
+  AddDish:
+    data:
+      # Meal prep first — its rules are the anchored ones ("as meal prep", "for
+      # meal prep"), and an anchored sentence must not be shadowed by the bare
+      # leftovers rule that matches less literal text.
+      - sentences:
+          - "(put|add|save) {delta} <portions> of {item} (in|into|to) <cold_slot> (as|for) <mealprep>"
+          - "(put|add|save) {delta} <portions> (in|into|to) <cold_slot> of {item} (as|for) <mealprep>"
+          - "(put|add|save) {delta} <portions> of {item} (as|for) <mealprep>"
+        slots:
+          kind: "mealprep"
+      - sentences:
+          - "(put|add|save) <det>{item} (in|into|to) <cold_slot> (as|for) <mealprep>"
+          - "(put|add|save) <det>{item} (as|for) <mealprep>"
+        slots:
+          kind: "mealprep"
+          delta: 1
+      # Leftovers, with an explicit portion count: "put 3 portions of chili in the fridge"
+      - sentences:
+          - "(put|add|save) {delta} <portions> of {item} (in|into|to) <cold_slot>"
+          - "(put|add|save) {delta} <portions> (in|into|to) <cold_slot> of {item}"
+          - "(we|I) (made|cooked) {delta} <portions> of {item}"
+        slots:
+          kind: "leftovers"
+      # Without one — assume a single portion.
+      - sentences:
+          - "(put|add|save) <det>{item} (in|into|to) <cold_slot>"
+          - "(put|save) <det>leftover {item} away"
+          - "(there's|there is) [some ]{item} left over"
+          - "(we|I) (have|made) [some ]{item} left over"
+        slots:
+          kind: "leftovers"
+          delta: 1
+
+  # Eating usually takes no kind: someone taking a serving out says what it is,
+  # not which list it is on, and the server then checks leftovers before meal prep
+  # — the portions on a clock go first. These rules exist so a speaker *can* say
+  # which, either by naming the list or by naming the cold storage that stands for
+  # it, which the server reads off the words in ``services.kind_named``.
+  #
+  # Qualified rules are declared first. They carry a trailing anchor and so match
+  # more literal text, which is what recognize_best prefers — but declaration
+  # order costs nothing and keeps them right under any matcher.
+  EatDish:
+    data:
+      # Naming the storage. {location} is captured rather than baked into a rule
+      # per word, so "fridge" and "deep freeze" stay defined in one place.
+      - sentences:
+          - "(we|I) ate {delta} <portions> of <det>{item} (from|out of) <cold_slot>"
+          - "(take|taking|took) out {delta} <portions> of <det>{item} (from|out of) <cold_slot>"
+      - sentences:
+          - "(we|I) (ate|had) <det>{item} (from|out of) <cold_slot>"
+          # "took the chili out of the freezer" was left to the LLM while it was a
+          # bare rule, because RemoveConsumable's "[I|we] [just] took {item}" also
+          # matches it and the winner depended on the matcher. The trailing
+          # <cold_slot> settles it: this matches strictly more literal text, which
+          # is what HA's recognize_best takes — and test_sentences.py calls
+          # recognize_best exactly as HA does, so the behaviour is pinned, not bet on.
+          - "(take|taking|took) <det>{item} (out of|from) <cold_slot>"
+        slots:
+          delta: 1
+      # Naming the list itself.
+      - sentences:
+          - "(we|I) (ate|had) <det>leftover {item}"
+        slots:
+          kind: "leftovers"
+          delta: 1
+      - sentences:
+          - "(we|I) (ate|had) <det>{item} (from|out of) [(the|our) ]<mealprep>"
+          - "(take|taking|took) <det>{item} (out of|from) [(the|our) ]<mealprep>"
+        slots:
+          kind: "mealprep"
+          delta: 1
+      # Unqualified — leftovers first, then meal prep.
+      - sentences:
+          - "(we|I) ate {delta} <portions> of <det>{item}"
+          # "taking out 1 serving of lasagne". Safe against RemoveConsumable's
+          # "(remove|take) {delta} <det>{item}" because the literal "out" sits
+          # where that rule wants a number.
+          - "(take|taking|took) out {delta} <portions> of <det>{item}"
+      - sentences:
+          # "ate/had" only — RemoveConsumable already owns "used/took/finished",
+          # and a phrasing both intents match is a coin flip at runtime.
+          - "(we|I) (ate|had) <det>{item}"
+        slots:
+          delta: 1
+
+  ListDish:
+    data:
+      # "What should we eat first?" — the oldest one, not the whole list. Its own
+      # scope rather than its own intent: same question, same list, different depth
+      # of answer, and a second intent would need its own script and handler to say
+      # a sentence services already composes.
+      - sentences:
+          - "(what's|whats|what is) the oldest <leftovers>"
+          # No noun at all — the question somebody actually asks at an open
+          # fridge. It means leftovers: nobody stands there wondering which
+          # frozen meal to defrost first.
+          - "what (should|do) (we|I) (eat|use|finish|have) first"
+          - "(what's|whats|what is) the oldest thing in [(the|our) ](fridge|refrigerator)"
+          - "(what|which) <leftovers> (should|do) (we|I) (eat|use|finish) first"
+          - "what needs (eating|using up|finishing)[ first]"
+          - "(what's|whats|what is) going off"
+        slots:
+          kind: "leftovers"
+          scope: "oldest"
+      - sentences:
+          - "(what's|whats|what is) the oldest <mealprep>"
+          - "(what's|whats|what is) the oldest thing in [(the|our) ](freezer|deep freeze)"
+          - "(what|which) <mealprep> (should|do) (we|I) (eat|use|finish) first"
+        slots:
+          kind: "mealprep"
+          scope: "oldest"
+      # The freezer belongs to meal prep now, so "what's in the freezer" asks that
+      # list. Leftovers keep the fridge. A leftover frozen for next week is on the
+      # meal prep page's clock either way, so nothing is hidden by this.
+      - sentences:
+          - "(what's|what is|what are) [(in|left in) ][(the|our) ](freezer|deep freeze)"
+          - "(what|which) <mealprep> (do we|do I|have we|have I) (have|got)"
+          - "(what's|what is) [(in|left in) ]<mealprep>"
+        slots:
+          kind: "mealprep"
+      - sentences:
+          - "(what's|what is|what are) [(in|left in) ][(the|our) ](fridge|refrigerator)"
+          - "(what|which) leftovers (do we|do I|have we|have I) (have|got)"
+          - "(what's|what is) for (dinner|lunch|tea)"
+          - "how old (is|are) the leftovers"
+        slots:
+          kind: "leftovers"

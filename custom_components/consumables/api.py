@@ -14,6 +14,9 @@ import aiohttp
 
 from .const import (
     PATH_ADJUST,
+    PATH_DISH_ADD,
+    PATH_DISH_EAT,
+    PATH_DISHES,
     PATH_ANSWER_LOCATION,
     PATH_INTERPRET,
     PATH_LOW,
@@ -101,6 +104,27 @@ class ConsumablesClient:
     async def answer_location(self, location: str, *, source: str = "ha") -> dict[str, Any]:
         """Where a newly added item lives — the second half of a two-turn add."""
         return await self._request("POST", PATH_ANSWER_LOCATION, json={"location": location, "source": source})
+
+    async def dish_add(
+        self, name: str, *, kind: str = "leftovers", portions: int = 1, location: str = "", source: str = "ha"
+    ) -> dict[str, Any]:
+        payload = {"name": name, "kind": kind, "portions": portions, "source": source}
+        if location:
+            payload["location"] = location
+        return await self._request("POST", PATH_DISH_ADD, json=payload)
+
+    async def dish_eat(
+        self, name: str, *, portions: int = 1, location: str = "", kind: str = "", source: str = "ha"
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"name": name, "portions": portions, "source": source}
+        if location:
+            payload["location"] = location
+        if kind:
+            payload["kind"] = kind
+        return await self._request("POST", PATH_DISH_EAT, json=payload)
+
+    async def dish_list(self, *, kind: str = "leftovers", scope: str = "all") -> dict[str, Any]:
+        return await self._request("GET", PATH_DISHES, params={"kind": kind, "scope": scope})
 
     async def query(self, name: str) -> dict[str, Any]:
         return await self._request("GET", PATH_QUERY, params={"name": name})

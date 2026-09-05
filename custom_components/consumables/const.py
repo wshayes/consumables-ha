@@ -20,6 +20,9 @@ PATH_INTERPRET = "/app/api/voice/interpret"
 PATH_SHOPPING = "/app/api/shopping"
 PATH_SHOPPING_ADD = "/app/api/shopping/add"
 PATH_SHOPPING_CHECK = "/app/api/shopping/check"
+PATH_DISHES = "/app/api/dishes"
+PATH_DISH_ADD = "/app/api/dishes/add"
+PATH_DISH_EAT = "/app/api/dishes/eat"
 
 # Intents handled locally by the bundled sentence templates. These are registered in
 # Python rather than through intent_script/rest_command YAML, so installing the
@@ -41,5 +44,10 @@ INTENT_SHOP_CHECK = "CheckOffShopping"
 INTENT_HASS_SHOP_ADD = "HassShoppingListAddItem"
 # Answering "where does it live?" after adding something never stocked before.
 INTENT_ANSWER_LOCATION = "AnswerLocation"
+# Leftovers and meal prep, both put away by the portion. One shape, two lists —
+# the kind travels in a slot rather than in the intent name.
+INTENT_DISH_ADD = "AddDish"
+INTENT_DISH_EAT = "EatDish"
+INTENT_DISH_LIST = "ListDish"
 
 REQUEST_TIMEOUT = 15
