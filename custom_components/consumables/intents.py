@@ -29,6 +29,7 @@ from .const import (
     INTENT_SHOP_ADD,
     INTENT_SHOP_CHECK,
     INTENT_SHOP_LIST,
+    INTENT_WHERE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -133,6 +134,38 @@ class _QueryHandler(intent.IntentHandler):
 
         item = body["item"]
         return _speak(intent_obj, f"You have {item['display_quantity']} of {item['name']}.")
+
+
+class _WhereHandler(intent.IntentHandler):
+    """Where something is kept, rather than how much of it there is.
+
+    Calls the same query endpoint — the item payload already carries the location, so
+    a second route to read one row would be one more thing to keep in step. The stock
+    level is mentioned only when it changes what the person does next: sending
+    somebody to the right cupboard for something that ran out is the one unhelpful
+    answer here.
+    """
+
+    intent_type = INTENT_WHERE
+    slot_schema = {vol.Required("item"): cv.string}
+
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
+        slots = self.async_validate_slots(intent_obj.slots)
+        name = slots["item"]["value"]
+
+        body = await _client_for(intent_obj.hass).query(name)
+        if (problem := _describe_failure(body, name)) is not None:
+            return _speak(intent_obj, problem)
+
+        item = body["item"]
+        if not item.get("location"):
+            return _speak(intent_obj, f"{item['name']} doesn't have a location set.")
+        where = f"{item['name']} is in the {item['location'].lower()}"
+        if item.get("is_out"):
+            return _speak(intent_obj, f"{where}, but you're out.")
+        if item.get("is_low"):
+            return _speak(intent_obj, f"{where}, and running low — {item['display_quantity']} left.")
+        return _speak(intent_obj, f"{where}.")
 
 
 class _ListLowHandler(intent.IntentHandler):
@@ -246,6 +279,7 @@ async def async_register_intents(hass: HomeAssistant) -> None:
         _AddRemoveHandler(INTENT_REMOVE, -1),
         _SetStateHandler(),
         _QueryHandler(),
+        _WhereHandler(),
         _ListLowHandler(),
         _ShoppingAddHandler(INTENT_SHOP_ADD),
         _ShoppingAddHandler(INTENT_HASS_SHOP_ADD),

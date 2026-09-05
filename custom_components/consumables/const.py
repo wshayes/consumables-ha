@@ -28,6 +28,9 @@ INTENT_ADD = "AddConsumable"
 INTENT_REMOVE = "RemoveConsumable"
 INTENT_SET_STATE = "SetConsumableState"
 INTENT_QUERY = "QueryConsumable"
+# "Where is the butter?" — reads the same row as QueryConsumable and phrases the
+# other half of it, so it needs no endpoint of its own.
+INTENT_WHERE = "WhereConsumable"
 INTENT_LIST_LOW = "ListLowStock"
 INTENT_SHOP_ADD = "AddToShoppingList"
 INTENT_SHOP_LIST = "ListShopping"

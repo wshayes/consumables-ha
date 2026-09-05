@@ -142,6 +142,19 @@ intents:
           - "(what's|what is) (our|the) {item} (count|level|stock)"
           - "are we out of {item}"
 
+  # "Where is the butter?" — a different question from "how much butter", with a
+  # different answer, so a separate intent rather than making every stock reply
+  # recite a location nobody asked for. Anchored on "where", which no other
+  # sentence here starts with, so there is nothing for it to collide with.
+  WhereConsumable:
+    data:
+      - sentences:
+          - "where (is|are) <det>{item}"
+          - "(where's|wheres) <det>{item}"
+          - "where (do|does) (we|I) (keep|store|put) <det>{item}"
+          - "where (is|are) <det>{item} (kept|stored|normally kept)"
+          - "(which|what) (shelf|cupboard|location) (is|are) <det>{item} (in|on)"
+
   ListLowStock:
     data:
       - sentences:
