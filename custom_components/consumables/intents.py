@@ -24,6 +24,7 @@ from .const import (
     INTENT_QUERY,
     INTENT_REMOVE,
     INTENT_SET_STATE,
+    INTENT_HASS_SHOP_ADD,
     INTENT_SHOP_ADD,
     INTENT_SHOP_CHECK,
     INTENT_SHOP_LIST,
@@ -68,7 +69,7 @@ def _describe_failure(body: dict, spoken_name: str) -> str | None:
 
 class _AddRemoveHandler(intent.IntentHandler):
     slot_schema = {
-        vol.Required("name"): cv.string,
+        vol.Required("item"): cv.string,
         vol.Optional("delta"): vol.Coerce(int),
     }
 
@@ -78,7 +79,7 @@ class _AddRemoveHandler(intent.IntentHandler):
 
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         slots = self.async_validate_slots(intent_obj.slots)
-        name = slots["name"]["value"]
+        name = slots["item"]["value"]
         delta = abs(int(slots.get("delta", {}).get("value", 1) or 1)) * self._sign
 
         client = _client_for(intent_obj.hass)
@@ -95,13 +96,13 @@ class _AddRemoveHandler(intent.IntentHandler):
 class _SetStateHandler(intent.IntentHandler):
     intent_type = INTENT_SET_STATE
     slot_schema = {
-        vol.Required("name"): cv.string,
+        vol.Required("item"): cv.string,
         vol.Required("state"): vol.In(["in_stock", "low", "out"]),
     }
 
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         slots = self.async_validate_slots(intent_obj.slots)
-        name = slots["name"]["value"]
+        name = slots["item"]["value"]
         state = slots["state"]["value"]
 
         client = _client_for(intent_obj.hass)
@@ -114,11 +115,11 @@ class _SetStateHandler(intent.IntentHandler):
 
 class _QueryHandler(intent.IntentHandler):
     intent_type = INTENT_QUERY
-    slot_schema = {vol.Required("name"): cv.string}
+    slot_schema = {vol.Required("item"): cv.string}
 
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         slots = self.async_validate_slots(intent_obj.slots)
-        name = slots["name"]["value"]
+        name = slots["item"]["value"]
 
         body = await _client_for(intent_obj.hass).query(name)
         if (problem := _describe_failure(body, name)) is not None:
@@ -144,15 +145,31 @@ class _ListLowHandler(intent.IntentHandler):
 
 
 class _ShoppingAddHandler(intent.IntentHandler):
-    intent_type = INTENT_SHOP_ADD
+    """Serves our own intent and Home Assistant's built-in `HassShoppingListAddItem`.
+
+    HA ships its own sentences for "add X to the shopping list". They match the same
+    literal text ours do, so which one wins is a coin flip decided by HA's matcher —
+    and on an install with no `shopping_list` integration the built-in has no handler
+    at all, so the household just hears "Unknown intent HassShoppingListAddItem".
+    Answering HA's intent as well as ours makes both roads lead here, which is a
+    better answer than asking people to unexpose a list entity they may not have.
+    Its slot is `item`, the same one our sentences now use.
+
+    ponytail: `HassListAddItem` (the modern todo-entity one) is deliberately left
+    alone — HA core handles it, and overriding it would break real to-do lists.
+    """
+
     slot_schema = {
-        vol.Required("name"): cv.string,
+        vol.Required("item"): cv.string,
         vol.Optional("delta"): vol.Coerce(int),
     }
 
+    def __init__(self, intent_type: str) -> None:
+        self.intent_type = intent_type
+
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         slots = self.async_validate_slots(intent_obj.slots)
-        name = slots["name"]["value"]
+        name = slots["item"]["value"]
         qty = slots.get("delta", {}).get("value")
 
         body = await _client_for(intent_obj.hass).shopping_add(
@@ -182,11 +199,11 @@ class _ShoppingListHandler(intent.IntentHandler):
 
 class _ShoppingCheckHandler(intent.IntentHandler):
     intent_type = INTENT_SHOP_CHECK
-    slot_schema = {vol.Required("name"): cv.string}
+    slot_schema = {vol.Required("item"): cv.string}
 
     async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         slots = self.async_validate_slots(intent_obj.slots)
-        name = slots["name"]["value"]
+        name = slots["item"]["value"]
 
         body = await _client_for(intent_obj.hass).shopping_check(name, source=_device_of(intent_obj))
         if (problem := _describe_failure(body, name)) is not None:
@@ -202,7 +219,8 @@ async def async_register_intents(hass: HomeAssistant) -> None:
         _SetStateHandler(),
         _QueryHandler(),
         _ListLowHandler(),
-        _ShoppingAddHandler(),
+        _ShoppingAddHandler(INTENT_SHOP_ADD),
+        _ShoppingAddHandler(INTENT_HASS_SHOP_ADD),
         _ShoppingListHandler(),
         _ShoppingCheckHandler(),
     ):

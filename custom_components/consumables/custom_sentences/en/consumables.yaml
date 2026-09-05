@@ -35,7 +35,11 @@ language: "en"
 
 lists:
   # Free text — the server resolves it against Item.name and Item.aliases.
-  name:
+  # NOT called `name`: Home Assistant reserves that slot for its own list of
+  # exposed entity names and silently overrides a wildcard declared here, so
+  # every `{name}` sentence stopped matching groceries and answered "I am not
+  # aware of any device called eggs". `item` is what HA's own list intents use.
+  item:
     wildcard: true
   delta:
     range:
@@ -61,24 +65,24 @@ intents:
     data:
       # With an explicit count: "add 3 paper towels to the pantry"
       - sentences:
-          - "(add|put) {delta} <det>{name} (to|in|into) <store>"
-          - "[(I|we) ][just ](bought|picked up|got|have) {delta} <det>{name}"
+          - "(add|put) {delta} <det>{item} (to|in|into) <store>"
+          - "[(I|we) ][just ](bought|picked up|got|have) {delta} <det>{item}"
       # Without one — assume a single unit.
       - sentences:
-          - "(add|put) <det>{name} (to|in|into) <store>"
-          - "[(I|we) ][just ](bought|picked up|got) <det>{name}"
-          - "(restock|refill|replenish) <det>{name}"
+          - "(add|put) <det>{item} (to|in|into) <store>"
+          - "[(I|we) ][just ](bought|picked up|got) <det>{item}"
+          - "(restock|refill|replenish) <det>{item}"
         slots:
           delta: 1
 
   RemoveConsumable:
     data:
       - sentences:
-          - "(remove|take|use[d]|took) {delta} <det>{name}"
-          - "(remove|take) {delta} <det>{name} (from|out of) <store>"
+          - "(remove|take|use[d]|took) {delta} <det>{item}"
+          - "(remove|take) {delta} <det>{item} (from|out of) <store>"
       - sentences:
-          - "[(I|we) ][just ](used|took|opened|finished) <det>{name}"
-          - "(remove|take) <det>{name} (from|out of) <store>"
+          - "[(I|we) ][just ](used|took|opened|finished) <det>{item}"
+          - "(remove|take) <det>{item} (from|out of) <store>"
         slots:
           delta: 1
 
@@ -87,32 +91,32 @@ intents:
       # "we're out of dish soap" — the highest-value phrasing, and the one people
       # actually say at the moment they notice something has run out.
       - sentences:
-          - "(we're|we are|we've|we have|I'm|I am) [all ]out of {name}"
-          - "(we|I) (ran|have run) out of {name}"
-          - "(there's|there is) no {name} (left|remaining)"
-          - "{name} (is|are) [all ](gone|out|empty|finished)"
+          - "(we're|we are|we've|we have|I'm|I am) [all ]out of {item}"
+          - "(we|I) (ran|have run) out of {item}"
+          - "(there's|there is) no {item} (left|remaining)"
+          - "{item} (is|are) [all ](gone|out|empty|finished)"
         slots:
           state: "out"
       - sentences:
-          - "(we're|we are|we|I'm|I am|I) [(running|getting) ]low on {name}"
-          - "(we're|we are) almost out of {name}"
-          - "{name} (is|are) [(running|getting) ]low"
+          - "(we're|we are|we|I'm|I am|I) [(running|getting) ]low on {item}"
+          - "(we're|we are) almost out of {item}"
+          - "{item} (is|are) [(running|getting) ]low"
         slots:
           state: "low"
       - sentences:
-          - "(we're|we are) (stocked up on|fine for|good for) {name}"
-          - "{name} (is|are) (restocked|back in stock|fine|full)"
+          - "(we're|we are) (stocked up on|fine for|good for) {item}"
+          - "{item} (is|are) (restocked|back in stock|fine|full)"
         slots:
           state: "in_stock"
 
   QueryConsumable:
     data:
       - sentences:
-          - "how (much|many) {name} (do we|do I|have we|have I) (have|got)[ left]"
-          - "how (much|many) {name} (is|are) (there|left)"
-          - "(do|have) (we|I) (have|got) [(any|enough) ]{name}"
-          - "(what's|what is) (our|the) {name} (count|level|stock)"
-          - "are we out of {name}"
+          - "how (much|many) {item} (do we|do I|have we|have I) (have|got)[ left]"
+          - "how (much|many) {item} (is|are) (there|left)"
+          - "(do|have) (we|I) (have|got) [(any|enough) ]{item}"
+          - "(what's|what is) (our|the) {item} (count|level|stock)"
+          - "are we out of {item}"
 
   ListLowStock:
     data:
@@ -131,14 +135,14 @@ intents:
   CheckOffShopping:
     data:
       - sentences:
-          # "bought/picked up {name}" is already AddConsumable's — these phrasings are
+          # "bought/picked up {item}" is already AddConsumable's — these phrasings are
           # deliberately different so the two intents can't collide.
-          - "check off {name}"
-          - "(cross|tick) {name} off <shopping_list>"
-          - "mark {name} as bought"
+          - "check off {item}"
+          - "(cross|tick) {item} off <shopping_list>"
+          - "mark {item} as bought"
 
-  # Bare "(add|put) {name}" has no trailing anchor, so on its own it matches "put the
-  # lasagne in the fridge" with name="lasagne in the fridge". What saves it is the
+  # Bare "(add|put) {item}" has no trailing anchor, so on its own it matches "put the
+  # lasagne in the fridge" with item="lasagne in the fridge". What saves it is the
   # matcher, not the ordering: HA's default agent calls hassil's recognize_best
   # (see homeassistant/components/conversation/default_agent.py), which prefers the
   # sentence matching the most literal text and so picks the anchored phrasing every
@@ -149,16 +153,16 @@ intents:
     data:
       # With an explicit count: "put 3 milk on the shopping list", "we need 2 milk"
       - sentences:
-          - "put {delta} <det>{name} on <shopping_list>"
-          - "(add|put) {delta} <det>{name}"
-          - "(we|I) need {delta} <det>{name}"
+          - "put {delta} <det>{item} on <shopping_list>"
+          - "(add|put) {delta} <det>{item}"
+          - "(we|I) need {delta} <det>{item}"
       # Without one — assume a single unit.
       - sentences:
-          - "put <det>{name} on <shopping_list>"
-          - "add <det>{name} to <shopping_list>"
+          - "put <det>{item} on <shopping_list>"
+          - "add <det>{item} to <shopping_list>"
           # Bare "add milk" — ours only because HA's list entity is unexposed. The
           # anchored phrasings sit above it so they win inside this intent too.
-          - "(add|put) <det>{name}"
-          - "(we|I) need <det>{name}"
+          - "(add|put) <det>{item}"
+          - "(we|I) need <det>{item}"
         slots:
           delta: 1

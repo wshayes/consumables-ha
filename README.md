@@ -17,29 +17,29 @@ Keep your household inventory up to date by talking to a Home Assistant Voice de
    code, and enter it along with your Consumables address.
 5. Restart once more so Home Assistant picks up the sentence templates the
    integration installed.
-6. **Turn off Home Assistant's own shopping list** — see below. This one is not
-   optional.
 
 There is no token to copy and nothing to paste into `configuration.yaml`.
 
-## Turn off Home Assistant's own shopping list
+## Home Assistant's own shopping list
 
-> **⚠️ Consumables and Home Assistant's built-in shopping list collide.** Both claim
-> "add milk" and "add milk to the shopping list". Which one wins is decided by
-> Home Assistant's sentence matcher, not by either integration, so leaving both
-> enabled makes those phrasings a coin flip — some of what you say lands on a list
-> Consumables cannot see, and you find out at the shops.
+Home Assistant ships sentences for "add milk to the shopping list" too, and they
+match the same words ours do — so which one wins is decided by HA's matcher, not by
+either integration. **You do not have to do anything about this.** Consumables
+answers HA's `HassShoppingListAddItem` as well as its own intent, so both roads lead
+to your Consumables list.
+
+(Before v0.1.2 they did not, and on an install with no shopping-list integration set
+up the collision produced a spoken `Unknown intent HassShoppingListAddItem` with no
+log entry to explain it.)
+
+If you keep a **to-do list entity** (`todo.shopping_list`) and would rather Assist
+stopped targeting it, **Settings → Voice assistants → Expose** and toggle it off.
+That is a preference now, not a fix: the entity, its contents, and any automation or
+dashboard card using it all keep working either way.
 
 Consumables replaces it rather than sitting alongside it. Its list is filtered by
 store, fills itself from anything running low, and checking an item off restocks the
 item it came from.
-
-1. **Settings → Voice assistants**, then the **Expose** tab.
-2. Find `todo.shopping_list` (older installs name it `shopping_list.shopping_list`).
-3. Toggle it off.
-
-The entity, its contents, and any automation or dashboard card using it all keep
-working — Assist just stops targeting it. Flip the toggle back to undo.
 
 If you would rather remove it entirely: **Settings → Devices & services → Local
 To-do** (or **Shopping list** on older installs) → delete the entry. That does
@@ -84,6 +84,15 @@ alias — so "loo roll" costs one round trip, once, and is free from then on.
 
 ## Status
 
-Scaffold — the code is complete but has not yet been exercised against a running
-Home Assistant instance. Expect to shake out import paths and API details on first
-install. Issues and PRs welcome.
+First run against a real Home Assistant instance: 2026-09-05. Two bugs found and
+fixed in v0.1.2:
+
+- **The spoken item slot could not be called `name`.** HA reserves that slot for its
+  own list of exposed entity names and silently overrides a wildcard declared in a
+  custom sentence file, so every sentence with an item in it stopped matching
+  groceries and answered "I am not aware of any device called eggs". The slot is
+  `item` now. Sentences with no item in them ("what are we running low on") always
+  worked, which is what made this look like a partial install rather than a bug.
+- **`HassShoppingListAddItem` had no handler.** See above.
+
+Issues and PRs welcome.

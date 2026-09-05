@@ -31,5 +31,9 @@ INTENT_LIST_LOW = "ListLowStock"
 INTENT_SHOP_ADD = "AddToShoppingList"
 INTENT_SHOP_LIST = "ListShopping"
 INTENT_SHOP_CHECK = "CheckOffShopping"
+# Home Assistant's own legacy shopping-list intent. Its built-in sentences claim
+# "add X to the shopping list" and outrank ours, so we answer it too rather than
+# leaving it to fail as "Unknown intent" on installs with no shopping_list set up.
+INTENT_HASS_SHOP_ADD = "HassShoppingListAddItem"
 
 REQUEST_TIMEOUT = 15
