@@ -102,6 +102,9 @@ intents:
       - sentences:
           - "(add|put) {delta} <det>{item} (to|in|into) <store>"
           - "[(I|we) ][just ](bought|picked up|got|have) {delta} <det>{item}"
+          # Counted and unanchored: "add 1 floss" is stock. Only the uncounted
+          # "add floss" is still the shopping list's.
+          - "(add|put) {delta} <det>{item}"
       # Without one — assume a single unit.
       - sentences:
           - "(add|put) <det>{item} (to|in|into) <store>"
@@ -205,8 +208,10 @@ intents:
     data:
       # With an explicit count: "put 3 milk on the shopping list", "we need 2 milk"
       - sentences:
-          - "put {delta} <det>{item} on <shopping_list>"
-          - "(add|put) {delta} <det>{item}"
+          # The anchored form must carry {delta}, or "add 2 quinoa to the shopping
+          # list" matches the uncounted one and the number lands inside {item}.
+          - "(add|put) {delta} <det>{item} (on|to) <shopping_list>"
+          - "(we|I) need {delta} <det>{item} (on|to) <shopping_list>"
           - "(we|I) need {delta} <det>{item}"
       # Without one — assume a single unit.
       - sentences:

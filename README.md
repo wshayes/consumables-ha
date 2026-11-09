@@ -5,12 +5,16 @@ Keep your household inventory up to date by talking to a Home Assistant Voice de
 > "We're out of paper towels."
 > "Add three paper towels to the pantry."
 > "Add milk." — goes on the shopping list
+> "Add two milk." — you have them: adds stock
 > "What are we running low on?"
 
 ## Install
 
-1. **HACS → Integrations → ⋮ → Custom repositories**, add this repository as an
-   *Integration*, then install **Consumables**.
+1. **Settings → Marketplace → Add from link**, enter `wshayes/consumables-ha`, then
+   install **Consumables**. (The Marketplace replaced HACS in Home Assistant 2026.11.
+   On an older release, use **HACS → Integrations → ⋮ → Custom repositories** and add
+   this repository as an *Integration*. Anything installed through HACS moves to the
+   Marketplace on its own when you upgrade.)
 2. Restart Home Assistant.
 3. **Settings → Devices & services → Add integration → Consumables**.
 4. In Consumables on the web, go to **Voice → Connect Home Assistant** for a pairing
@@ -19,6 +23,14 @@ Keep your household inventory up to date by talking to a Home Assistant Voice de
    integration installed.
 
 There is no token to copy and nothing to paste into `configuration.yaml`.
+
+## Update
+
+New releases appear under **Settings → Updates**. The Marketplace checks a custom
+repository like this one every 48 hours, so allow up to two days. Install it, then
+**restart Home Assistant** — the integration rewrites its sentence file on start-up,
+and Home Assistant only reads sentence files at start-up, so without the restart the
+old phrasings stay in effect.
 
 ## Home Assistant's own shopping list
 
@@ -75,8 +87,11 @@ alias — so "loo roll" costs one round trip, once, and is free from then on.
 ## Notes
 
 - **Bare "add milk" goes on the shopping list**, matching the habit Home Assistant's
-  own list built. Say "add milk to the pantry" when you mean the inventory — that you
-  already have it, rather than needing to buy it. Both are matched locally and free.
+  own list built. Give it a number — "add two milk" — or say "add milk to the
+  pantry" when you mean the inventory: that you already have it, rather than needing
+  to buy it. To put a number on the list, name it: "add two milk to the shopping
+  list". All of these are matched locally and free. (Before v0.1.7 "add two milk"
+  went on the shopping list too.)
 - **Rotating credentials.** Generating a new pairing code invalidates the old token.
   Re-run the integration setup with the new code.
 - **Your data stays in your Consumables instance.** This integration talks only to
